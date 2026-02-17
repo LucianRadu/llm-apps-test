@@ -1,10 +1,10 @@
-# MCP Server Template - Adobe I/O Runtime Application Configuration
-# 
-# This configuration file defines how your MCP server will be deployed to Adobe I/O Runtime.
+# MCP Apps Template - Adobe I/O Runtime Application Configuration
+#
+# This configuration file defines how your MCP Apps server will be deployed to Adobe I/O Runtime.
 # You can customize the settings below to match your specific requirements.
 
 application:
-  actions: actions
+  actions: server
   web: web-src
   runtimeManifest:
     packages:
@@ -12,9 +12,9 @@ application:
       llm-apps-poc:
         license: MIT
         actions:
-          # Main MCP server action
+          # Main MCP Apps server action
           mcp-server:
-            function: actions/mcp-server/index.js
+            function: server/index.js
             web: 'yes'
             runtime: 'nodejs:18'
             limits:

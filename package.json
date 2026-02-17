@@ -1,8 +1,8 @@
 {
   "name": "llm-apps-poc",
   "version": "1.0.0",
-  "description": "Model Context Protocol server with Adobe I/O Runtime",
-  "main": "actions/mcp-server/index.js",
+  "description": "MCP Apps boilerplate for Adobe I/O Runtime -- build AI tools with interactive widgets",
+  "main": "server/index.js",
   "scripts": {
     "test": "jest",
     "test:watch": "jest --watch",
@@ -10,9 +10,9 @@
     "deploy": "npm run build && aio app deploy",
     "undeploy": "aio app undeploy",
     "dev": "aio app run",
-    "start": "node actions/mcp-server/index.js",
-    "lint": "eslint actions/",
-    "format": "prettier --write actions/"
+    "start": "node server/index.js",
+    "lint": "eslint server/",
+    "format": "prettier --write server/"
   },
   "dependencies": {
     "@adobe/aio-sdk": "^5.0.0",

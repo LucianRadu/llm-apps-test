@@ -13,12 +13,21 @@ governing permissions and limitations under the License.
 const path = require('path')
 
 module.exports = {
-    entry: './actions/mcp-server/index.js',
+    entry: './server/index.js',
     mode: 'production',
     target: 'node',
     output: {
         path: path.resolve(__dirname, 'dist'),
         filename: 'index.js',
         libraryTarget: 'commonjs2'
+    },
+    module: {
+        rules: [
+            {
+                // Import .html files as raw strings (used for widget.html)
+                test: /\.html$/,
+                type: 'asset/source'
+            }
+        ]
     }
 }

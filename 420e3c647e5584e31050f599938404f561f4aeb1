@@ -1,0 +1,23 @@
+{
+  "schema_version": "1.0.0",
+  "mode": "full",
+  "commit_sha": "420e3c647e5584e31050f599938404f561f4aeb1",
+  "author": "lradu@adobe.com",
+  "timestamp": "2026-02-17T15:36:32+02:00",
+  "detection": {
+    "ai_assisted": true,
+    "method": "heuristic",
+    "tool": "cursor",
+    "model": "",
+    "confidence": 0.9
+  },
+  "stats": {
+    "total_additions": 0,
+    "total_deletions": 0,
+    "ai_additions": 0,
+    "ai_deletions": 0,
+    "human_additions": 0,
+    "human_deletions": 0
+  },
+  "files": {}
+}

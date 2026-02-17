@@ -1,0 +1,30 @@
+{
+  "schema_version": "1.0.0",
+  "mode": "full",
+  "commit_sha": "b7ffd196c96693b0a44903fa533e3421a9b8b265",
+  "author": "lradu@adobe.com",
+  "timestamp": "2026-02-17T15:40:11+02:00",
+  "detection": {
+    "ai_assisted": true,
+    "method": "heuristic",
+    "tool": "cursor",
+    "model": "",
+    "confidence": 0.9
+  },
+  "stats": {
+    "total_additions": 1,
+    "total_deletions": 1,
+    "ai_additions": 1,
+    "ai_deletions": 1,
+    "human_additions": 0,
+    "human_deletions": 0
+  },
+  "files": {
+    "server/actions/weather/widget.html": {
+      "ai_additions": 1,
+      "human_additions": 0,
+      "ai_deletions": 1,
+      "human_deletions": 0
+    }
+  }
+}

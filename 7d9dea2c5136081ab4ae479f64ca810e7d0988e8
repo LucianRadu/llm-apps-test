@@ -1,0 +1,30 @@
+{
+  "schema_version": "1.0.0",
+  "mode": "full",
+  "commit_sha": "7d9dea2c5136081ab4ae479f64ca810e7d0988e8",
+  "author": "lradu@adobe.com",
+  "timestamp": "2026-02-17T15:15:55+02:00",
+  "detection": {
+    "ai_assisted": false,
+    "method": "none",
+    "tool": "unknown",
+    "model": "",
+    "confidence": 0.0
+  },
+  "stats": {
+    "total_additions": 9,
+    "total_deletions": 9,
+    "ai_additions": 0,
+    "ai_deletions": 0,
+    "human_additions": 9,
+    "human_deletions": 9
+  },
+  "files": {
+    ".github/workflows/deploy_stage.yml": {
+      "ai_additions": 0,
+      "human_additions": 9,
+      "ai_deletions": 0,
+      "human_deletions": 9
+    }
+  }
+}

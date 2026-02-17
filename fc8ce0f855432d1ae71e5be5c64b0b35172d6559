@@ -1,0 +1,156 @@
+{
+  "schema_version": "1.0.0",
+  "mode": "full",
+  "commit_sha": "fc8ce0f855432d1ae71e5be5c64b0b35172d6559",
+  "author": "lradu@adobe.com",
+  "timestamp": "2026-02-17T14:24:46+02:00",
+  "detection": {
+    "ai_assisted": false,
+    "method": "none",
+    "tool": "unknown",
+    "model": "",
+    "confidence": 0.0
+  },
+  "stats": {
+    "total_additions": 1454,
+    "total_deletions": 1166,
+    "ai_additions": 0,
+    "ai_deletions": 0,
+    "human_additions": 1454,
+    "human_deletions": 1166
+  },
+  "files": {
+    ".github/workflows/deploy_prod.yml": {
+      "ai_additions": 0,
+      "human_additions": 10,
+      "ai_deletions": 0,
+      "human_deletions": 10
+    },
+    ".github/workflows/deploy_stage.yml": {
+      "ai_additions": 0,
+      "human_additions": 10,
+      "ai_deletions": 0,
+      "human_deletions": 10
+    },
+    "README.md": {
+      "ai_additions": 0,
+      "human_additions": 19,
+      "ai_deletions": 0,
+      "human_deletions": 3
+    },
+    "TEMPLATE-FEATURES.md": {
+      "ai_additions": 0,
+      "human_additions": 132,
+      "ai_deletions": 0,
+      "human_deletions": 43
+    },
+    "actions/mcp-server/tools.js": {
+      "ai_additions": 0,
+      "human_additions": 0,
+      "ai_deletions": 0,
+      "human_deletions": 375
+    },
+    "actions/mcp-server/webpack.config.js": {
+      "ai_additions": 0,
+      "human_additions": 0,
+      "ai_deletions": 0,
+      "human_deletions": 24
+    },
+    "actions/utils.js": {
+      "ai_additions": 0,
+      "human_additions": 0,
+      "ai_deletions": 0,
+      "human_deletions": 137
+    },
+    "app.config.yaml": {
+      "ai_additions": 0,
+      "human_additions": 6,
+      "ai_deletions": 0,
+      "human_deletions": 6
+    },
+    "jest.config.js": {
+      "ai_additions": 0,
+      "human_additions": 7,
+      "ai_deletions": 0,
+      "human_deletions": 19
+    },
+    "package.json": {
+      "ai_additions": 0,
+      "human_additions": 5,
+      "ai_deletions": 0,
+      "human_deletions": 5
+    },
+    "server/actions/calculator/index.js": {
+      "ai_additions": 0,
+      "human_additions": 72,
+      "ai_deletions": 0,
+      "human_deletions": 0
+    },
+    "server/actions/echo/index.js": {
+      "ai_additions": 0,
+      "human_additions": 38,
+      "ai_deletions": 0,
+      "human_deletions": 0
+    },
+    "server/actions/weather/index.js": {
+      "ai_additions": 0,
+      "human_additions": 139,
+      "ai_deletions": 0,
+      "human_deletions": 0
+    },
+    "server/actions/weather/widget.html": {
+      "ai_additions": 0,
+      "human_additions": 390,
+      "ai_deletions": 0,
+      "human_deletions": 0
+    },
+    "{actions/mcp-server => server}/index.js": {
+      "ai_additions": 0,
+      "human_additions": 38,
+      "ai_deletions": 0,
+      "human_deletions": 56
+    },
+    "server/loader.js": {
+      "ai_additions": 0,
+      "human_additions": 224,
+      "ai_deletions": 0,
+      "human_deletions": 0
+    },
+    "test/html-transform.js": {
+      "ai_additions": 0,
+      "human_additions": 11,
+      "ai_deletions": 0,
+      "human_deletions": 0
+    },
+    "test/mcp-server.test.js": {
+      "ai_additions": 0,
+      "human_additions": 0,
+      "ai_deletions": 0,
+      "human_deletions": 351
+    },
+    "test/server.test.js": {
+      "ai_additions": 0,
+      "human_additions": 312,
+      "ai_deletions": 0,
+      "human_deletions": 0
+    },
+    "test/utils.test.js": {
+      "ai_additions": 0,
+      "human_additions": 0,
+      "ai_deletions": 0,
+      "human_deletions": 111
+    },
+    "webpack-config.js": {
+      "ai_additions": 0,
+      "human_additions": 31,
+      "ai_deletions": 0,
+      "human_deletions": 15
+    },
+    "webpack.config.js": {
+      "ai_additions": 0,
+      "human_additions": 10,
+      "ai_deletions": 0,
+      "human_deletions": 1
+    }
+  }
+}

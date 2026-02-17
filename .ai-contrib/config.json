@@ -1,0 +1,10 @@
+{
+  "tracking_enabled": true,
+  "exclude_patterns": [
+    "*.lock",
+    "*.min.js",
+    "*.min.css"
+  ],
+  "stats_push_enabled": true,
+  "full_mode": true
+}

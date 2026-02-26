@@ -1,0 +1,79 @@
+{
+  "experiences": [
+    {
+      "name": "weather",
+      "title": "Weather",
+      "description": "Get current weather information for any city. Demonstrates an MCP App action with an interactive widget.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "city": {
+            "type": "string",
+            "description": "Name of the city to get weather for (e.g., \"San Francisco\", \"New York\", \"London\")"
+          }
+        },
+        "required": ["city"]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": true
+      },
+      "tool_meta": {
+        "ui": {
+          "visibility": ["model", "app"]
+        },
+        "openai/toolInvocation/invoking": "Fetching weather data...",
+        "openai/toolInvocation/invoked": "Weather data ready",
+        "openai/widgetAccessible": true
+      },
+      "resource_meta": {
+        "ui": {
+          "prefersBorder": true
+        }
+      }
+    },
+    {
+      "name": "calculator",
+      "title": "Calculator",
+      "description": "Perform basic mathematical calculations. Supports arithmetic operations and common mathematical functions.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "expression": {
+            "type": "string",
+            "description": "Mathematical expression to evaluate (e.g., \"2 + 3 * 4\", \"sqrt(16)\", \"sin(30)\")"
+          },
+          "format": {
+            "type": "string",
+            "enum": ["decimal", "scientific", "fraction"],
+            "description": "Number format for the result (default: decimal)"
+          }
+        },
+        "required": ["expression"]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "idempotentHint": true
+      }
+    },
+    {
+      "name": "echo",
+      "title": "Echo",
+      "description": "A simple utility that echoes back the input message. Useful for testing connectivity, debugging, or confirming that the MCP server is responding correctly.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "description": "The message you want to echo back"
+          }
+        },
+        "required": ["message"]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "idempotentHint": true
+      }
+    }
+  ]
+}

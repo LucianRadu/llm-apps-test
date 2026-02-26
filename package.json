@@ -6,7 +6,8 @@
   "scripts": {
     "test": "jest",
     "test:watch": "jest --watch",
-    "build": "webpack",
+    "prebuild": "node -e \"const f=require('fs');if(!f.existsSync('experiences.json'))f.writeFileSync('experiences.json','{\\\"experiences\\\":[]}')\"",
+    "build": "npm run prebuild && webpack",
     "deploy": "npm run build && aio app deploy",
     "undeploy": "aio app undeploy",
     "dev": "aio app run",

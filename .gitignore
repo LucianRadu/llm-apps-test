@@ -6,6 +6,9 @@ dist
 .env*
 .aio
 
+# Local dev config (copy from experiences.example.json)
+experiences.json
+
 # Test output
 junit.xml
 

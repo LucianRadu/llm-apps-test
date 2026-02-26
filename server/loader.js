@@ -14,88 +14,196 @@ governing permissions and limitations under the License.
  * Action Loader for MCP Apps
  *
  * Discovers actions from the actions/ directory and registers them with the MCP server.
- * Each action is a directory containing an index.js (tool definition) and an optional
- * widget.html (interactive UI). When widget.html is present, the loader registers both
- * the tool (with _meta.ui metadata) and a ui:// resource (the HTML widget).
+ * Each action is a directory containing an index.js (handler) and an optional widget.html.
+ *
+ * Supported export shapes:
+ *   - Function:           module.exports = async (args) => ({ ... })
+ *   - Object w/ handler:  module.exports = { handler: async (args) => ({ ... }) }
+ *   - Object w/ schema:   module.exports = { schema: { ... }, handler: async (args) => ({ ... }) }
+ *
+ * Metadata (description, inputSchema, annotations, tool_meta, resource_meta) comes from
+ * experiences.json (local dev) or the DB (production via repo-deploy). An inline `schema`
+ * export is used as fallback when experiences.json doesn't provide inputSchema.
  *
  * Convention:
- *   actions/<name>/index.js   -> required: { name, description, schema, handler }
+ *   actions/<name>/index.js   -> required: handler function
  *   actions/<name>/widget.html -> optional: self-contained HTML rendered in host iframe
- *   actions/<name>/index.js widget export -> optional: { visibility, csp, permissions, domain, prefersBorder }
  */
 
 const fs = require('fs')
 const path = require('path')
+const { z } = require('zod')
 
 const RESOURCE_MIME_TYPE = 'text/html;profile=mcp-app'
 
 /**
+ * Normalize an action module into { handler, schema? } regardless of export shape.
+ */
+function normalizeAction (mod) {
+    if (typeof mod === 'function') return { handler: mod }
+    if (mod && typeof mod.handler === 'function') return mod
+    if (mod && typeof mod.default === 'function') return { handler: mod.default }
+    if (mod && mod.default && typeof mod.default.handler === 'function') return mod.default
+    return null
+}
+
+/**
+ * Validate that a normalized action has the required exports.
+ */
+function validateAction (mod, source) {
+    const action = normalizeAction(mod)
+    if (!action) {
+        console.warn(`Skipping ${source}: must export a function, { handler }, or { schema, handler }`)
+        return false
+    }
+    return true
+}
+
+/**
+ * Convert a JSON Schema property to its Zod equivalent.
+ * Handles the common types used in MCP tool input schemas.
+ */
+function jsonSchemaPropertyToZod (prop, isRequired) {
+    let zodType
+    if (prop.enum) {
+        zodType = z.enum(prop.enum)
+    } else {
+        switch (prop.type) {
+        case 'string':
+            zodType = z.string()
+            break
+        case 'number':
+            zodType = z.number()
+            break
+        case 'integer':
+            zodType = z.number().int()
+            break
+        case 'boolean':
+            zodType = z.boolean()
+            break
+        case 'array':
+            zodType = z.array(z.any())
+            break
+        default:
+            zodType = z.any()
+        }
+    }
+    if (prop.description) zodType = zodType.describe(prop.description)
+    if (!isRequired) zodType = zodType.optional()
+    return zodType
+}
+
+/**
+ * Convert a JSON Schema object to a Zod raw shape suitable for registerTool().
+ * Returns undefined if the schema can't be converted.
+ */
+function jsonSchemaToZodShape (jsonSchema) {
+    if (!jsonSchema || jsonSchema.type !== 'object' || !jsonSchema.properties) {
+        return undefined
+    }
+    const required = new Set(jsonSchema.required || [])
+    const shape = {}
+    for (const [key, prop] of Object.entries(jsonSchema.properties)) {
+        shape[key] = jsonSchemaPropertyToZod(prop, required.has(key))
+    }
+    return shape
+}
+
+/**
  * Build clean _meta.ui object for the resource content, omitting undefined fields.
  */
-function buildResourceMeta (widgetConfig) {
-    if (!widgetConfig) return undefined
+function buildResourceMeta (resourceMeta) {
+    if (!resourceMeta) return undefined
 
     const ui = {}
-    if (widgetConfig.csp) ui.csp = widgetConfig.csp
-    if (widgetConfig.permissions) ui.permissions = widgetConfig.permissions
-    if (widgetConfig.domain !== undefined) ui.domain = widgetConfig.domain
-    if (widgetConfig.prefersBorder !== undefined) ui.prefersBorder = widgetConfig.prefersBorder
+    const src = resourceMeta.ui || resourceMeta
+    if (src.csp) ui.csp = src.csp
+    if (src.permissions) ui.permissions = src.permissions
+    if (src.domain !== undefined) ui.domain = src.domain
+    if (src.prefersBorder !== undefined) ui.prefersBorder = src.prefersBorder
 
     return Object.keys(ui).length > 0 ? { ui } : undefined
 }
 
 /**
- * Register a plain tool (no widget) with the MCP server.
+ * Register a single action with the MCP server.
+ * Uses registerTool() for all actions (unified path).
  */
-function registerPlainTool (server, action) {
-    server.tool(action.name, action.description, action.schema, action.handler)
+function registerAction (server, name, action, widgetHtml, config) {
+    const toolMeta = {}
+
+    // Schema precedence: experiences.json inputSchema (JSON Schema) > inline schema export (Zod) > none
+    let inputSchema
+    if (config?.inputSchema) {
+        inputSchema = jsonSchemaToZodShape(config.inputSchema)
+    } else if (action.schema) {
+        inputSchema = action.schema
+    }
+
+    if (widgetHtml) {
+        const resourceUri = `ui://${name}/widget.html`
+        const resourceMeta = buildResourceMeta(config?.resource_meta)
+
+        server.registerResource(
+            `${name}-widget`,
+            resourceUri,
+            { mimeType: RESOURCE_MIME_TYPE },
+            async () => ({
+                contents: [{
+                    uri: resourceUri,
+                    mimeType: RESOURCE_MIME_TYPE,
+                    text: widgetHtml,
+                    ...(resourceMeta ? { _meta: resourceMeta } : {})
+                }]
+            })
+        )
+
+        // MCP Apps keys
+        toolMeta.ui = { resourceUri, ...(config?.tool_meta?.ui || {}) }
+        toolMeta['ui/resourceUri'] = resourceUri
+
+        // OpenAI keys (always emit for dual-host compatibility)
+        toolMeta['openai/outputTemplate'] = resourceUri
+        toolMeta['openai/resultCanProduceWidget'] = true
+    }
+
+    // Merge any additional tool_meta from config
+    if (config?.tool_meta) {
+        for (const [key, value] of Object.entries(config.tool_meta)) {
+            if (key !== 'ui') {
+                toolMeta[key] = value
+            }
+        }
+    }
+
+    server.registerTool(name, {
+        title: config?.title || name,
+        description: config?.description || name,
+        inputSchema,
+        annotations: config?.annotations || undefined,
+        _meta: Object.keys(toolMeta).length > 0 ? toolMeta : undefined
+    }, action.handler)
 }
 
 /**
- * Register a widget-enabled action with the MCP server.
- * This registers both the tool (with _meta.ui) and the ui:// resource.
+ * Load experiences config from experiences.json, keyed by action name.
  */
-function registerWidgetAction (server, action, widgetHtml) {
-    const resourceUri = `ui://${action.name}/widget.html`
-    const widgetConfig = action.widget || {}
-
-    // Build tool _meta with UI linkage
-    const toolMeta = {
-        ui: {
-            resourceUri
-        },
-        'ui/resourceUri': resourceUri // legacy key for older host compatibility
+function loadExperiencesConfig (actionsDir) {
+    const configPath = path.resolve(actionsDir, '..', 'experiences.json')
+    try {
+        if (fs.existsSync(configPath)) {
+            const raw = JSON.parse(fs.readFileSync(configPath, 'utf-8'))
+            const map = {}
+            for (const exp of raw.experiences || []) {
+                if (exp.name) map[exp.name] = exp
+            }
+            console.log(`Loaded experiences.json with ${Object.keys(map).length} experience(s)`)
+            return map
+        }
+    } catch (e) {
+        console.warn('Failed to load experiences.json:', e.message)
     }
-
-    // Add optional visibility
-    if (widgetConfig.visibility) {
-        toolMeta.ui.visibility = widgetConfig.visibility
-    }
-
-    // Register tool with UI metadata using registerTool (lower-level API)
-    server.registerTool(action.name, {
-        description: action.description,
-        inputSchema: action.schema,
-        _meta: toolMeta
-    }, action.handler)
-
-    // Build resource _meta.ui from widget config
-    const resourceMeta = buildResourceMeta(widgetConfig)
-
-    // Register the widget HTML as a ui:// resource
-    server.registerResource(
-        `${action.name}-widget`,
-        resourceUri,
-        { mimeType: RESOURCE_MIME_TYPE },
-        async () => ({
-            contents: [{
-                uri: resourceUri,
-                mimeType: RESOURCE_MIME_TYPE,
-                text: widgetHtml,
-                ...(resourceMeta ? { _meta: resourceMeta } : {})
-            }]
-        })
-    )
+    return {}
 }
 
 /**
@@ -109,13 +217,25 @@ function registerWidgetAction (server, action, widgetHtml) {
 function loadActions (server, actionsDir) {
     try {
         // Webpack build path: use require.context for static bundling
-        const moduleContext = require.context('./actions', true, /index\.js$/)
-        const htmlContext = require.context('./actions', true, /widget\.html$/)
+        const moduleContext = require.context('../actions', true, /index\.js$/)
+        const htmlContext = require.context('../actions', true, /widget\.html$/)
 
-        // Build a map of available widget HTML strings keyed by action directory
+        // Load bundled experiences config (webpack resolves at build time).
+        // In production deploys, repo-deploy generates experiences.json from DB
+        // before building, so the bundled config has full metadata.
+        let experiencesConfig = {}
+        try {
+            const rawConfig = require('../experiences.json')
+            for (const exp of rawConfig.experiences || []) {
+                if (exp.name) experiencesConfig[exp.name] = exp
+            }
+            if (Object.keys(experiencesConfig).length > 0) {
+                console.log(`Loaded bundled experiences config with ${Object.keys(experiencesConfig).length} experience(s)`)
+            }
+        } catch (e) { /* empty or not bundled */ }
+
         const widgetMap = {}
         for (const key of htmlContext.keys()) {
-            // key format: "./weather/widget.html" -> extract "weather"
             const actionName = key.split('/')[1]
             widgetMap[actionName] = htmlContext(key)
         }
@@ -125,20 +245,21 @@ function loadActions (server, actionsDir) {
 
         for (const key of modules) {
             try {
-                const action = moduleContext(key)
-                // key format: "./echo/index.js" -> extract "echo"
+                const mod = moduleContext(key)
                 const dirName = key.split('/')[1]
 
-                if (!validateAction(action, key)) continue
+                if (!validateAction(mod, key)) continue
 
+                const action = normalizeAction(mod)
                 const widgetHtml = widgetMap[dirName]
+                const config = experiencesConfig[dirName]
+
+                registerAction(server, dirName, action, widgetHtml, config)
 
                 if (widgetHtml) {
-                    registerWidgetAction(server, action, widgetHtml)
-                    console.log(`  ✓ Loaded action: ${action.name} (tool + widget)`)
+                    console.log(`  ✓ Loaded action: ${dirName} (tool + widget)`)
                 } else {
-                    registerPlainTool(server, action)
-                    console.log(`  ✓ Loaded action: ${action.name} (tool only)`)
+                    console.log(`  ✓ Loaded action: ${dirName} (tool only)`)
                 }
             } catch (error) {
                 console.error(`Error loading action from ${key}:`, error.message)
@@ -146,14 +267,15 @@ function loadActions (server, actionsDir) {
         }
     } catch (error) {
         // Fallback: fs-based loading for non-webpack environments (Jest, local dev)
-        loadActionsFromFs(server, actionsDir)
+        const experiencesConfig = loadExperiencesConfig(actionsDir)
+        loadActionsFromFs(server, actionsDir, experiencesConfig)
     }
 }
 
 /**
  * Filesystem-based action loading (used in Jest tests and local development).
  */
-function loadActionsFromFs (server, actionsDir) {
+function loadActionsFromFs (server, actionsDir, experiencesConfig) {
     if (!fs.existsSync(actionsDir)) {
         console.warn(`Actions directory not found: ${actionsDir}`)
         return
@@ -173,9 +295,12 @@ function loadActionsFromFs (server, actionsDir) {
                 continue
             }
 
-            const action = require(indexPath)
+            const mod = require(indexPath)
 
-            if (!validateAction(action, dirName)) continue
+            if (!validateAction(mod, dirName)) continue
+
+            const action = normalizeAction(mod)
+            const config = experiencesConfig[dirName]
 
             // Check for widget.html
             const widgetPath = path.join(actionsDir, dirName, 'widget.html')
@@ -183,39 +308,16 @@ function loadActionsFromFs (server, actionsDir) {
 
             if (hasWidget) {
                 const widgetHtml = fs.readFileSync(widgetPath, 'utf-8')
-                registerWidgetAction(server, action, widgetHtml)
-                console.log(`  ✓ Loaded action: ${action.name} (tool + widget)`)
+                registerAction(server, dirName, action, widgetHtml, config)
+                console.log(`  ✓ Loaded action: ${dirName} (tool + widget)`)
             } else {
-                registerPlainTool(server, action)
-                console.log(`  ✓ Loaded action: ${action.name} (tool only)`)
+                registerAction(server, dirName, action, null, config)
+                console.log(`  ✓ Loaded action: ${dirName} (tool only)`)
             }
         } catch (error) {
             console.error(`Error loading action from ${dirName}:`, error.message)
         }
     }
-}
-
-/**
- * Validate that an action module has the required exports.
- */
-function validateAction (action, source) {
-    if (!action.name || typeof action.name !== 'string') {
-        console.warn(`Skipping ${source}: missing or invalid 'name' property`)
-        return false
-    }
-    if (!action.description || typeof action.description !== 'string') {
-        console.warn(`Skipping ${source}: missing or invalid 'description' property`)
-        return false
-    }
-    if (!action.schema || typeof action.schema !== 'object') {
-        console.warn(`Skipping ${source}: missing or invalid 'schema' property`)
-        return false
-    }
-    if (!action.handler || typeof action.handler !== 'function') {
-        console.warn(`Skipping ${source}: missing or invalid 'handler' function`)
-        return false
-    }
-    return true
 }
 
 module.exports = {

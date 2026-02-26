@@ -28,6 +28,7 @@ module.exports = {
 
     collectCoverageFrom: [
         'server/**/*.js',
+        'actions/**/*.js',
         '!server/**/dist/**',
         '!server/**/node_modules/**'
     ],

@@ -49,7 +49,7 @@ function createMcpServer () {
     })
 
     const baseDir = __dirname
-    loadActions(server, path.join(baseDir, 'actions'))
+    loadActions(server, path.join(baseDir, '..', 'actions'))
 
     if (logger) {
         logger.info('MCP Server created with actions registered')

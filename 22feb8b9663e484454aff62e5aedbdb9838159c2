@@ -1,0 +1,72 @@
+{
+  "schema_version": "1.0.0",
+  "mode": "full",
+  "commit_sha": "22feb8b9663e484454aff62e5aedbdb9838159c2",
+  "author": "lradu@adobe.com",
+  "timestamp": "2026-02-27T16:23:05+02:00",
+  "detection": {
+    "ai_assisted": true,
+    "method": "editor_hook",
+    "tool": "cursor",
+    "model": "",
+    "confidence": 1.0
+  },
+  "stats": {
+    "total_additions": 375,
+    "total_deletions": 0,
+    "ai_additions": 375,
+    "ai_deletions": 0,
+    "human_additions": 0,
+    "human_deletions": 0
+  },
+  "files": {
+    ".gitignore": {
+      "ai_additions": 1,
+      "human_additions": 0,
+      "ai_deletions": 0,
+      "human_deletions": 0,
+      "ai_lines": "11",
+      "human_lines": ""
+    },
+    "TEMPLATE-FEATURES.md": {
+      "ai_additions": 66,
+      "human_additions": 0,
+      "ai_deletions": 0,
+      "human_deletions": 0,
+      "ai_lines": "32-37,87-138,179-180,212-217",
+      "human_lines": ""
+    },
+    "actions/eds-hello-world/index.js": {
+      "ai_additions": 59,
+      "human_additions": 0,
+      "ai_deletions": 0,
+      "human_deletions": 0,
+      "ai_lines": "1-59",
+      "human_lines": ""
+    },
+    "server/loader.js": {
+      "ai_additions": 39,
+      "human_additions": 0,
+      "ai_deletions": 0,
+      "human_deletions": 0,
+      "ai_lines": "1-39",
+      "human_lines": ""
+    },
+    "test/fixtures/experiences.json": {
+      "ai_additions": 103,
+      "human_additions": 0,
+      "ai_deletions": 0,
+      "human_deletions": 0,
+      "ai_lines": "1-103",
+      "human_lines": ""
+    },
+    "test/server.test.js": {
+      "ai_additions": 107,
+      "human_additions": 0,
+      "ai_deletions": 0,
+      "human_deletions": 0,
+      "ai_lines": "128-129,344-432,455-456,544-557",
+      "human_lines": ""
+    }
+  }
+}

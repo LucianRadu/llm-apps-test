@@ -21,7 +21,7 @@ module.exports = async ({ message = 'No message provided' }) => ({
     content: [
         {
             type: 'text',
-            text: `Echo v3: ${message} [${new Date().toISOString()}]`
+            text: `Echo v3 (from a change): ${message} [${new Date().toISOString()}]`
         }
     ]
 })

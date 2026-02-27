@@ -8,6 +8,7 @@ dist
 
 # Local dev config (copy from experiences.example.json)
 experiences.json
+!test/fixtures/experiences.json
 
 # Test output
 junit.xml

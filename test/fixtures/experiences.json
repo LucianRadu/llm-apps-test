@@ -1,0 +1,103 @@
+{
+  "experiences": [
+    {
+      "name": "weather",
+      "title": "Weather",
+      "description": "Get current weather information for any city.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "city": {
+            "type": "string",
+            "description": "Name of the city to get weather for"
+          }
+        },
+        "required": ["city"]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": true
+      },
+      "tool_meta": {
+        "ui": {
+          "visibility": ["model", "app"]
+        },
+        "openai/toolInvocation/invoking": "Fetching weather data...",
+        "openai/toolInvocation/invoked": "Weather data ready",
+        "openai/widgetAccessible": true
+      },
+      "resource_meta": {
+        "ui": {
+          "prefersBorder": true
+        }
+      }
+    },
+    {
+      "name": "calculator",
+      "title": "Calculator",
+      "description": "Perform basic mathematical calculations.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "expression": {
+            "type": "string",
+            "description": "Mathematical expression to evaluate"
+          },
+          "format": {
+            "type": "string",
+            "enum": ["decimal", "scientific", "fraction"],
+            "description": "Number format for the result"
+          }
+        },
+        "required": ["expression"]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "idempotentHint": true
+      }
+    },
+    {
+      "name": "echo",
+      "title": "Echo",
+      "description": "A simple utility that echoes back the input message.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "description": "The message to echo back"
+          }
+        },
+        "required": ["message"]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "idempotentHint": true
+      }
+    },
+    {
+      "name": "eds-hello-world",
+      "title": "EDS Hello World",
+      "description": "Browse the Adobe merchandise shirt catalog.",
+      "widget_type": "EDS",
+      "eds_widget": {
+        "script_url": "https://main--eds-01--posabogdanpetre.aem.page/scripts/aem-embed.js",
+        "widget_embed_url": "https://main--eds-01--posabogdanpetre.aem.page/eds-widgets/adobe-shirts"
+      },
+      "annotations": {
+        "readOnlyHint": true
+      },
+      "tool_meta": {
+        "openai/widgetAccessible": true
+      },
+      "resource_meta": {
+        "ui": {
+          "csp": {
+            "connectDomains": ["https://main--eds-01--posabogdanpetre.aem.page"],
+            "resourceDomains": ["https://main--eds-01--posabogdanpetre.aem.page"]
+          }
+        }
+      }
+    }
+  ]
+}

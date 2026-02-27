@@ -16,6 +16,11 @@ governing permissions and limitations under the License.
  * Discovers actions from the actions/ directory and registers them with the MCP server.
  * Each action is a directory containing an index.js (handler) and an optional widget.html.
  *
+ * Widget resolution priority:
+ *   1. widget.html file in the action directory (self-contained HTML)
+ *   2. EDS config in experiences.json (auto-generates aem-embed template)
+ *   3. Tool-only (no widget)
+ *
  * Supported export shapes:
  *   - Function:           module.exports = async (args) => ({ ... })
  *   - Object w/ handler:  module.exports = { handler: async (args) => ({ ... }) }
@@ -123,6 +128,25 @@ function buildResourceMeta (resourceMeta) {
     if (src.prefersBorder !== undefined) ui.prefersBorder = src.prefersBorder
 
     return Object.keys(ui).length > 0 ? { ui } : undefined
+}
+
+/**
+ * Generate widget HTML for an EDS (Edge Delivery Services) action.
+ * Produces a minimal template that loads aem-embed.js and renders AEM content.
+ * Returns null if the config is missing required URLs.
+ */
+function generateEdsWidgetHtml (config) {
+    if (config?.widget_type !== 'EDS') return null
+
+    const edsWidget = config.eds_widget
+    if (!edsWidget?.script_url || !edsWidget?.widget_embed_url) {
+        if (config.widget_type === 'EDS') {
+            console.warn(`  ⚠ EDS widget for "${config.name}": missing script_url or widget_embed_url in eds_widget config`)
+        }
+        return null
+    }
+
+    return `<script src="${edsWidget.script_url}" type="module"></script>\n<div>\n    <aem-embed url="${edsWidget.widget_embed_url}"></aem-embed>\n</div>\n`
 }
 
 /**
@@ -251,13 +275,15 @@ function loadActions (server, actionsDir) {
                 if (!validateAction(mod, key)) continue
 
                 const action = normalizeAction(mod)
-                const widgetHtml = widgetMap[dirName]
                 const config = experiencesConfig[dirName]
+                const widgetHtml = widgetMap[dirName] || generateEdsWidgetHtml(config)
 
                 registerAction(server, dirName, action, widgetHtml, config)
 
-                if (widgetHtml) {
+                if (widgetMap[dirName]) {
                     console.log(`  ✓ Loaded action: ${dirName} (tool + widget)`)
+                } else if (widgetHtml) {
+                    console.log(`  ✓ Loaded action: ${dirName} (tool + EDS widget)`)
                 } else {
                     console.log(`  ✓ Loaded action: ${dirName} (tool only)`)
                 }
@@ -302,17 +328,22 @@ function loadActionsFromFs (server, actionsDir, experiencesConfig) {
             const action = normalizeAction(mod)
             const config = experiencesConfig[dirName]
 
-            // Check for widget.html
+            // Widget resolution: widget.html file > EDS config > tool-only
             const widgetPath = path.join(actionsDir, dirName, 'widget.html')
-            const hasWidget = fs.existsSync(widgetPath)
+            const hasWidgetFile = fs.existsSync(widgetPath)
 
-            if (hasWidget) {
+            if (hasWidgetFile) {
                 const widgetHtml = fs.readFileSync(widgetPath, 'utf-8')
                 registerAction(server, dirName, action, widgetHtml, config)
                 console.log(`  ✓ Loaded action: ${dirName} (tool + widget)`)
             } else {
-                registerAction(server, dirName, action, null, config)
-                console.log(`  ✓ Loaded action: ${dirName} (tool only)`)
+                const edsHtml = generateEdsWidgetHtml(config)
+                registerAction(server, dirName, action, edsHtml, config)
+                if (edsHtml) {
+                    console.log(`  ✓ Loaded action: ${dirName} (tool + EDS widget)`)
+                } else {
+                    console.log(`  ✓ Loaded action: ${dirName} (tool only)`)
+                }
             }
         } catch (error) {
             console.error(`Error loading action from ${dirName}:`, error.message)
@@ -322,5 +353,6 @@ function loadActionsFromFs (server, actionsDir, experiencesConfig) {
 
 module.exports = {
     loadActions,
+    generateEdsWidgetHtml,
     RESOURCE_MIME_TYPE
 }

@@ -125,7 +125,8 @@ describe('MCP Apps Server', () => {
                 expect(toolNames).toContain('echo')
                 expect(toolNames).toContain('calculator')
                 expect(toolNames).toContain('weather')
-                expect(toolNames).toHaveLength(3)
+                expect(toolNames).toContain('eds-hello-world')
+                expect(toolNames).toHaveLength(4)
             })
 
             test('tools should have descriptions from experiences.json', async () => {
@@ -340,6 +341,95 @@ describe('MCP Apps Server', () => {
                 expect(content._meta.ui.prefersBorder).toBe(true)
             })
         })
+
+        describe('EDS Widget', () => {
+            test('EDS action should be registered as a tool with widget metadata', async () => {
+                const result = await mcpPost({
+                    jsonrpc: '2.0',
+                    id: 40,
+                    method: 'tools/list',
+                    params: {}
+                })
+
+                const body = JSON.parse(result.body)
+                const edsTool = body.result.tools.find(t => t.name === 'eds-hello-world')
+
+                expect(edsTool).toBeDefined()
+                expect(edsTool.description).toBe('Browse the Adobe merchandise shirt catalog.')
+                expect(edsTool._meta).toBeDefined()
+                expect(edsTool._meta.ui.resourceUri).toBe('ui://eds-hello-world/widget.html')
+                expect(edsTool._meta['openai/outputTemplate']).toBe('ui://eds-hello-world/widget.html')
+                expect(edsTool._meta['openai/resultCanProduceWidget']).toBe(true)
+            })
+
+            test('EDS widget resource should appear in resources/list', async () => {
+                const result = await mcpPost({
+                    jsonrpc: '2.0',
+                    id: 41,
+                    method: 'resources/list',
+                    params: {}
+                })
+
+                const body = JSON.parse(result.body)
+                const edsResource = body.result.resources.find(
+                    r => r.uri === 'ui://eds-hello-world/widget.html'
+                )
+                expect(edsResource).toBeDefined()
+                expect(edsResource.mimeType).toBe('text/html;profile=mcp-app')
+            })
+
+            test('EDS widget HTML should contain aem-embed element', async () => {
+                const result = await mcpPost({
+                    jsonrpc: '2.0',
+                    id: 42,
+                    method: 'resources/read',
+                    params: { uri: 'ui://eds-hello-world/widget.html' }
+                })
+
+                const body = JSON.parse(result.body)
+                const content = body.result.contents[0]
+
+                expect(content.uri).toBe('ui://eds-hello-world/widget.html')
+                expect(content.mimeType).toBe('text/html;profile=mcp-app')
+                expect(content.text).toContain('<aem-embed')
+                expect(content.text).toContain('url="https://main--eds-01--posabogdanpetre.aem.page/eds-widgets/adobe-shirts"')
+                expect(content.text).toContain('src="https://main--eds-01--posabogdanpetre.aem.page/scripts/aem-embed.js"')
+            })
+
+            test('EDS widget resource should include _meta.ui with CSP', async () => {
+                const result = await mcpPost({
+                    jsonrpc: '2.0',
+                    id: 43,
+                    method: 'resources/read',
+                    params: { uri: 'ui://eds-hello-world/widget.html' }
+                })
+
+                const body = JSON.parse(result.body)
+                const content = body.result.contents[0]
+
+                expect(content._meta).toBeDefined()
+                expect(content._meta.ui).toBeDefined()
+                expect(content._meta.ui.csp).toBeDefined()
+                expect(content._meta.ui.csp.connectDomains).toContain('https://main--eds-01--posabogdanpetre.aem.page')
+                expect(content._meta.ui.csp.resourceDomains).toContain('https://main--eds-01--posabogdanpetre.aem.page')
+            })
+
+            test('EDS tool handler should return shirt catalog', async () => {
+                const result = await mcpPost({
+                    jsonrpc: '2.0',
+                    id: 44,
+                    method: 'tools/call',
+                    params: { name: 'eds-hello-world', arguments: {} }
+                })
+
+                expect(result.statusCode).toBe(200)
+                const body = JSON.parse(result.body)
+                expect(body.result.content[0].text).toContain('12 Adobe shirts')
+                expect(body.result.structuredContent).toBeDefined()
+                expect(body.result.structuredContent.shirts).toHaveLength(12)
+                expect(body.result.structuredContent.shirts[0].id).toBe('button-up-carly-berry')
+            })
+        })
     })
 
     // --- Mode B: Without experiences.json ---
@@ -362,7 +452,8 @@ describe('MCP Apps Server', () => {
             expect(toolNames).toContain('echo')
             expect(toolNames).toContain('calculator')
             expect(toolNames).toContain('weather')
-            expect(toolNames).toHaveLength(3)
+            expect(toolNames).toContain('eds-hello-world')
+            expect(toolNames).toHaveLength(4)
 
             const echo = body.result.tools.find(t => t.name === 'echo')
             expect(echo.description).toBe('echo')
@@ -450,6 +541,20 @@ describe('MCP Apps Server', () => {
             const body = JSON.parse(result.body)
             // Without schema, SDK strips unknown args; handler uses defaults
             expect(body.result.content[0].text).toContain('No message provided')
+        })
+
+        test('EDS action should be tool-only without experiences.json (no widget)', async () => {
+            const result = await mcpPost({
+                jsonrpc: '2.0',
+                id: 37,
+                method: 'tools/list',
+                params: {}
+            })
+
+            const body = JSON.parse(result.body)
+            const edsTool = body.result.tools.find(t => t.name === 'eds-hello-world')
+            expect(edsTool).toBeDefined()
+            expect(edsTool._meta?.ui?.resourceUri).toBeUndefined()
         })
     })
 

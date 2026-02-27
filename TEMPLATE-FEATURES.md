@@ -30,6 +30,12 @@ Mock weather API with an interactive weather card widget. Demonstrates:
 - Host theme integration via CSS custom properties
 - MCP Apps metadata: visibility, CSP, permissions, border preference
 
+### EDS Hello World (tool + EDS widget)
+AEM Edge Delivery Services widget with no `widget.html` file. Demonstrates:
+- Config-driven widget: the loader auto-generates an `aem-embed` template from `experiences.json`
+- EDS content embedding via the `<aem-embed>` web component
+- CSP configuration for EDS domains
+
 ## Action Convention
 
 Each action lives in `server/actions/<name>/`:
@@ -79,6 +85,58 @@ module.exports = {
 }
 ```
 
+### Action with EDS widget (config-driven)
+
+EDS (Edge Delivery Services) widgets don't need a `widget.html` file. Configure `widget_type` and `eds_widget` in `experiences.json` and the loader generates the `aem-embed` template automatically:
+
+```json
+{
+  "name": "eds-hello-world",
+  "title": "EDS Hello World",
+  "description": "Displays content from an AEM EDS page.",
+  "widget_type": "EDS",
+  "eds_widget": {
+    "script_url": "https://main--eds-01--posabogdanpetre.aem.page/scripts/aem-embed.js",
+    "widget_embed_url": "https://main--eds-01--posabogdanpetre.aem.page/eds-widgets/adobe-shirts"
+  },
+  "resource_meta": {
+    "ui": {
+      "csp": {
+        "connectDomains": ["https://main--eds-01--posabogdanpetre.aem.page"],
+        "resourceDomains": ["https://main--eds-01--posabogdanpetre.aem.page"]
+      }
+    }
+  }
+}
+```
+
+The loader generates this HTML and registers it as an MCP resource:
+
+```html
+<script src="https://main--eds-01--posabogdanpetre.aem.page/scripts/aem-embed.js" type="module"></script>
+<div>
+    <aem-embed url="https://main--eds-01--posabogdanpetre.aem.page/eds-widgets/adobe-shirts"></aem-embed>
+</div>
+```
+
+The `<aem-embed>` web component fetches and renders content from the EDS page at runtime.
+
+**Widget resolution priority:**
+
+1. `widget.html` file in the action directory (always wins -- use this to override the generated template)
+2. EDS config in `experiences.json` (auto-generates `aem-embed` template)
+3. No widget (tool-only)
+
+### EDS Widget Configuration Reference
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `widget_type` | Yes | Must be `"EDS"` |
+| `eds_widget.script_url` | Yes | URL to `aem-embed.js` on your EDS site |
+| `eds_widget.widget_embed_url` | Yes | URL to the EDS page to embed |
+| `resource_meta.ui.csp.connectDomains` | Recommended | Allowed fetch/XHR domains (your EDS domain) |
+| `resource_meta.ui.csp.resourceDomains` | Recommended | Allowed resource domains (scripts, styles, images) |
+
 ### Widget Configuration Reference
 
 All fields in the `widget` object are optional. The loader applies sensible defaults.
@@ -118,6 +176,8 @@ your-mcp-app/
 │       │   └── index.js       # Tool only
 │       ├── calculator/
 │       │   └── index.js       # Tool only
+│       ├── eds-hello-world/
+│       │   └── index.js       # Tool + EDS widget (no widget.html needed)
 │       └── weather/
 │           ├── index.js       # Tool + widget config
 │           └── widget.html    # Interactive UI
@@ -149,9 +209,12 @@ npm run deploy     # Deploy to I/O Runtime
 
 ## Adding a New Action
 
-1. Create `server/actions/your-action/index.js` with `name`, `description`, `schema`, `handler`
-2. (Optional) Add `server/actions/your-action/widget.html` for an interactive UI
-3. (Optional) Export a `widget` config object from `index.js` for CSP, permissions, etc.
+1. Create `actions/your-action/index.js` with a handler function
+2. Add metadata to `experiences.json` (description, inputSchema, annotations)
+3. Choose your widget strategy:
+   - **No widget**: done -- tool-only action
+   - **Custom widget**: add `actions/your-action/widget.html` with self-contained HTML
+   - **EDS widget**: add `widget_type: "EDS"` and `eds_widget` config to `experiences.json` (no HTML file needed)
 4. The loader discovers it automatically -- no registration boilerplate needed
 
 ## Security & Performance

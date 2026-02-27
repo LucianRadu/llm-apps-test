@@ -21,7 +21,7 @@ module.exports = async ({ message = 'No message provided' }) => ({
     content: [
         {
             type: 'text',
-            text: `Echo: ${message}`
+            text: `Echo v2: ${message} [deployed via Azure Function pipeline]`
         }
     ]
 })

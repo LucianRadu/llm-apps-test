@@ -6,6 +6,7 @@ on:
       - main
 jobs:
   deploy:
+    if: false
     name: Deploy to Stage
     runs-on: ${{ matrix.os }}
     strategy:

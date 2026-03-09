@@ -5,6 +5,7 @@ on:
     types: [released]
 jobs:
   deploy:
+    if: false
     name: Deploy to Prod
     runs-on: ${{ matrix.os }}
     strategy:

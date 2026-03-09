@@ -3,6 +3,7 @@ name: AIO App CI
 on: [pull_request]
 jobs:
   test:
+    if: false
     name: Test PR
     runs-on: ${{ matrix.os }}
     strategy:

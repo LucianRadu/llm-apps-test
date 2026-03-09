@@ -1,5 +1,5 @@
 {
-  "experiences": [
+  "actions": [
     {
       "name": "weather",
       "title": "Weather",
@@ -83,6 +83,75 @@
       "eds_widget": {
         "script_url": "https://main--eds-01--posabogdanpetre.aem.page/scripts/aem-embed.js",
         "widget_embed_url": "https://main--eds-01--posabogdanpetre.aem.page/eds-widgets/adobe-shirts"
+      },
+      "annotations": {
+        "readOnlyHint": true
+      },
+      "tool_meta": {
+        "openai/widgetAccessible": true
+      },
+      "resource_meta": {
+        "ui": {
+          "csp": {
+            "connectDomains": ["https://main--eds-01--posabogdanpetre.aem.page"],
+            "resourceDomains": ["https://main--eds-01--posabogdanpetre.aem.page"]
+          }
+        }
+      }
+    },
+    {
+      "name": "showModels",
+      "title": "Show Models",
+      "description": "Browse Kawasaki motorcycle models in an interactive carousel.",
+      "widget_type": "EDS",
+      "eds_widget": {
+        "script_url": "https://main--eds-01--posabogdanpetre.aem.page/scripts/aem-embed.js",
+        "widget_embed_url": "https://main--eds-01--posabogdanpetre.aem.page/eds-widgets/automotive-car-models"
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": true
+      },
+      "tool_meta": {
+        "openai/toolInvocation/invoking": "Loading motorcycle models...",
+        "openai/toolInvocation/invoked": "Motorcycle models ready",
+        "openai/widgetAccessible": true
+      },
+      "resource_meta": {
+        "ui": {
+          "prefersBorder": true,
+          "csp": {
+            "connectDomains": ["https://main--eds-01--posabogdanpetre.aem.page"],
+            "resourceDomains": ["https://main--eds-01--posabogdanpetre.aem.page"]
+          }
+        }
+      }
+    },
+    {
+      "name": "no-handler-tool",
+      "title": "No Handler Tool",
+      "description": "Action defined in config only, no handler folder exists.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "A query parameter"
+          }
+        }
+      },
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "no-handler-eds",
+      "title": "No Handler EDS Widget",
+      "description": "EDS widget action with no handler folder.",
+      "widget_type": "EDS",
+      "eds_widget": {
+        "script_url": "https://main--eds-01--posabogdanpetre.aem.page/scripts/aem-embed.js",
+        "widget_embed_url": "https://main--eds-01--posabogdanpetre.aem.page/eds-widgets/no-handler-test"
       },
       "annotations": {
         "readOnlyHint": true

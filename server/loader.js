@@ -13,26 +13,25 @@ governing permissions and limitations under the License.
 /**
  * Action Loader for MCP Apps
  *
- * Discovers actions from the actions/ directory and registers them with the MCP server.
- * Each action is a directory containing an index.js (handler) and an optional widget.html.
+ * Registration is driven by actions.json -- each entry becomes an MCP tool.
+ * Handler folders in actions/<name>/ are optional; when present they provide
+ * the handler, when absent a default handler returns empty content.
+ *
+ * In local dev, actions.json comes from actions.example.json (copied manually).
+ * In production, the deploy pipeline writes actions.json from the DB before building.
  *
  * Widget resolution priority:
  *   1. widget.html file in the action directory (self-contained HTML)
- *   2. EDS config in experiences.json (auto-generates aem-embed template)
+ *   2. EDS config in actions.json (auto-generates aem-embed template)
  *   3. Tool-only (no widget)
  *
- * Supported export shapes:
+ * Supported handler export shapes:
  *   - Function:           module.exports = async (args) => ({ ... })
  *   - Object w/ handler:  module.exports = { handler: async (args) => ({ ... }) }
  *   - Object w/ schema:   module.exports = { schema: { ... }, handler: async (args) => ({ ... }) }
  *
- * Metadata (description, inputSchema, annotations, tool_meta, resource_meta) comes from
- * experiences.json (local dev) or the DB (production via repo-deploy). An inline `schema`
- * export is used as fallback when experiences.json doesn't provide inputSchema.
- *
- * Convention:
- *   actions/<name>/index.js   -> required: handler function
- *   actions/<name>/widget.html -> optional: self-contained HTML rendered in host iframe
+ * When actions.json is missing or empty, falls back to filesystem discovery
+ * for backward compatibility during local development.
  */
 
 const fs = require('fs')
@@ -62,6 +61,17 @@ function validateAction (mod, source) {
         return false
     }
     return true
+}
+
+/**
+ * Create a default handler for actions defined in actions.json without a handler folder.
+ * Returns empty content and structuredContent so the tool is callable but produces no output.
+ */
+function createDefaultHandler (name) {
+    return async () => ({
+        content: [{ type: 'text', text: '' }],
+        structuredContent: {}
+    })
 }
 
 /**
@@ -156,7 +166,7 @@ function generateEdsWidgetHtml (config) {
 function registerAction (server, name, action, widgetHtml, config) {
     const toolMeta = {}
 
-    // Schema precedence: experiences.json inputSchema (JSON Schema) > inline schema export (Zod) > none
+    // Schema precedence: actions.json inputSchema (JSON Schema) > inline schema export (Zod) > none
     let inputSchema
     if (config?.inputSchema) {
         inputSchema = jsonSchemaToZodShape(config.inputSchema)
@@ -210,28 +220,32 @@ function registerAction (server, name, action, widgetHtml, config) {
 }
 
 /**
- * Load experiences config from experiences.json, keyed by action name.
+ * Load actions config from actions.json, keyed by action name.
  */
-function loadExperiencesConfig (actionsDir) {
-    const configPath = path.resolve(actionsDir, '..', 'experiences.json')
+function loadActionsConfig (actionsDir) {
+    const configPath = path.resolve(actionsDir, '..', 'actions.json')
     try {
         if (fs.existsSync(configPath)) {
             const raw = JSON.parse(fs.readFileSync(configPath, 'utf-8'))
             const map = {}
-            for (const exp of raw.experiences || []) {
-                if (exp.name) map[exp.name] = exp
+            for (const act of raw.actions || []) {
+                if (act.name) map[act.name] = act
             }
-            console.log(`Loaded experiences.json with ${Object.keys(map).length} experience(s)`)
+            console.log(`Loaded actions.json with ${Object.keys(map).length} action(s)`)
             return map
         }
     } catch (e) {
-        console.warn('Failed to load experiences.json:', e.message)
+        console.warn('Failed to load actions.json:', e.message)
     }
     return {}
 }
 
 /**
- * Load all actions from the actions/ directory and register them with the MCP server.
+ * Load and register actions driven by actions.json config.
+ *
+ * actions.json is the source of truth for what tools get registered.
+ * Handler folders in actions/ are optional -- if present they provide the
+ * handler, if absent a default handler returns empty content.
  *
  * Uses webpack's require.context at build time, with a fs-based fallback for Jest.
  *
@@ -244,115 +258,197 @@ function loadActions (server, actionsDir) {
         const moduleContext = require.context('../actions', true, /index\.js$/)
         const htmlContext = require.context('../actions', true, /widget\.html$/)
 
-        // Load bundled experiences config (webpack resolves at build time).
-        // In production deploys, repo-deploy generates experiences.json from DB
-        // before building, so the bundled config has full metadata.
-        let experiencesConfig = {}
+        // Load bundled actions config (webpack resolves at build time).
+        // In production, the deploy pipeline writes actions.json from DB before building.
+        let actionsConfig = {}
         try {
-            const rawConfig = require('../experiences.json')
-            for (const exp of rawConfig.experiences || []) {
-                if (exp.name) experiencesConfig[exp.name] = exp
-            }
-            if (Object.keys(experiencesConfig).length > 0) {
-                console.log(`Loaded bundled experiences config with ${Object.keys(experiencesConfig).length} experience(s)`)
+            const rawConfig = require('../actions.json')
+            for (const act of rawConfig.actions || []) {
+                if (act.name) actionsConfig[act.name] = act
             }
         } catch (e) { /* empty or not bundled */ }
 
-        const widgetMap = {}
-        for (const key of htmlContext.keys()) {
-            const actionName = key.split('/')[1]
-            widgetMap[actionName] = htmlContext(key)
-        }
+        const configCount = Object.keys(actionsConfig).length
 
-        const modules = moduleContext.keys()
-        console.log(`Loading ${modules.length} action(s)`)
+        // When actions.json has entries, it drives registration (config-driven mode).
+        // When empty/missing, fall back to filesystem discovery for backward compat.
+        if (configCount > 0) {
+            console.log(`Registering ${configCount} action(s) from actions.json`)
 
-        for (const key of modules) {
-            try {
-                const mod = moduleContext(key)
+            const moduleMap = {}
+            for (const key of moduleContext.keys()) {
                 const dirName = key.split('/')[1]
+                moduleMap[dirName] = moduleContext(key)
+            }
 
-                if (!validateAction(mod, key)) continue
+            const widgetMap = {}
+            for (const key of htmlContext.keys()) {
+                const actionName = key.split('/')[1]
+                widgetMap[actionName] = htmlContext(key)
+            }
 
-                const action = normalizeAction(mod)
-                const config = experiencesConfig[dirName]
-                const widgetHtml = widgetMap[dirName] || generateEdsWidgetHtml(config)
+            for (const [name, config] of Object.entries(actionsConfig)) {
+                try {
+                    let action
+                    const mod = moduleMap[name]
 
-                registerAction(server, dirName, action, widgetHtml, config)
+                    if (mod && validateAction(mod, name)) {
+                        action = normalizeAction(mod)
+                    } else {
+                        action = { handler: createDefaultHandler(name) }
+                    }
 
-                if (widgetMap[dirName]) {
-                    console.log(`  ✓ Loaded action: ${dirName} (tool + widget)`)
-                } else if (widgetHtml) {
-                    console.log(`  ✓ Loaded action: ${dirName} (tool + EDS widget)`)
-                } else {
-                    console.log(`  ✓ Loaded action: ${dirName} (tool only)`)
+                    const widgetHtml = widgetMap[name] || generateEdsWidgetHtml(config)
+                    registerAction(server, name, action, widgetHtml, config)
+
+                    const hasHandler = !!mod
+                    if (widgetMap[name]) {
+                        console.log(`  ✓ ${name} (${hasHandler ? 'handler' : 'default'} + widget)`)
+                    } else if (widgetHtml) {
+                        console.log(`  ✓ ${name} (${hasHandler ? 'handler' : 'default'} + EDS widget)`)
+                    } else {
+                        console.log(`  ✓ ${name} (${hasHandler ? 'handler' : 'default'}, tool only)`)
+                    }
+                } catch (error) {
+                    console.error(`Error registering action "${name}":`, error.message)
                 }
-            } catch (error) {
-                console.error(`Error loading action from ${key}:`, error.message)
+            }
+        } else {
+            // Fallback: filesystem discovery when no actions.json is present
+            const widgetMap = {}
+            for (const key of htmlContext.keys()) {
+                const actionName = key.split('/')[1]
+                widgetMap[actionName] = htmlContext(key)
+            }
+
+            const modules = moduleContext.keys()
+            console.log(`No actions.json found, discovering ${modules.length} action(s) from filesystem`)
+
+            for (const key of modules) {
+                try {
+                    const mod = moduleContext(key)
+                    const dirName = key.split('/')[1]
+
+                    if (!validateAction(mod, key)) continue
+
+                    const action = normalizeAction(mod)
+                    const widgetHtml = widgetMap[dirName] || null
+
+                    registerAction(server, dirName, action, widgetHtml, undefined)
+
+                    if (widgetMap[dirName]) {
+                        console.log(`  ✓ Loaded action: ${dirName} (tool + widget)`)
+                    } else {
+                        console.log(`  ✓ Loaded action: ${dirName} (tool only)`)
+                    }
+                } catch (error) {
+                    console.error(`Error loading action from ${key}:`, error.message)
+                }
             }
         }
     } catch (error) {
         // Fallback: fs-based loading for non-webpack environments (Jest, local dev)
-        const experiencesConfig = loadExperiencesConfig(actionsDir)
-        loadActionsFromFs(server, actionsDir, experiencesConfig)
+        const actionsConfig = loadActionsConfig(actionsDir)
+        loadActionsFromFs(server, actionsDir, actionsConfig)
     }
 }
 
 /**
  * Filesystem-based action loading (used in Jest tests and local development).
+ *
+ * When actionsConfig has entries, it drives registration (config-driven).
+ * When empty, falls back to directory scanning for backward compatibility.
  */
-function loadActionsFromFs (server, actionsDir, experiencesConfig) {
-    if (!fs.existsSync(actionsDir)) {
-        console.warn(`Actions directory not found: ${actionsDir}`)
-        return
-    }
+function loadActionsFromFs (server, actionsDir, actionsConfig) {
+    const configNames = Object.keys(actionsConfig)
 
-    const dirs = fs.readdirSync(actionsDir, { withFileTypes: true })
-        .filter(d => d.isDirectory())
-        .map(d => d.name)
+    if (configNames.length > 0) {
+        console.log(`Registering ${configNames.length} action(s) from actions.json`)
 
-    console.log(`Loading ${dirs.length} action(s) from ${actionsDir}`)
+        for (const name of configNames) {
+            try {
+                const config = actionsConfig[name]
+                const indexPath = path.join(actionsDir, name, 'index.js')
+                const hasHandler = fs.existsSync(indexPath)
 
-    for (const dirName of dirs) {
-        try {
-            const indexPath = path.join(actionsDir, dirName, 'index.js')
-            if (!fs.existsSync(indexPath)) {
-                console.warn(`Skipping ${dirName}: no index.js found`)
-                continue
-            }
-
-            const mod = require(indexPath)
-
-            if (!validateAction(mod, dirName)) continue
-
-            const action = normalizeAction(mod)
-            const config = experiencesConfig[dirName]
-
-            // Widget resolution: widget.html file > EDS config > tool-only
-            const widgetPath = path.join(actionsDir, dirName, 'widget.html')
-            const hasWidgetFile = fs.existsSync(widgetPath)
-
-            if (hasWidgetFile) {
-                const widgetHtml = fs.readFileSync(widgetPath, 'utf-8')
-                registerAction(server, dirName, action, widgetHtml, config)
-                console.log(`  ✓ Loaded action: ${dirName} (tool + widget)`)
-            } else {
-                const edsHtml = generateEdsWidgetHtml(config)
-                registerAction(server, dirName, action, edsHtml, config)
-                if (edsHtml) {
-                    console.log(`  ✓ Loaded action: ${dirName} (tool + EDS widget)`)
+                let action
+                if (hasHandler) {
+                    const mod = require(indexPath)
+                    if (!validateAction(mod, name)) {
+                        action = { handler: createDefaultHandler(name) }
+                    } else {
+                        action = normalizeAction(mod)
+                    }
                 } else {
+                    action = { handler: createDefaultHandler(name) }
+                }
+
+                const widgetPath = path.join(actionsDir, name, 'widget.html')
+                const hasWidgetFile = fs.existsSync(widgetPath)
+                const widgetHtml = hasWidgetFile
+                    ? fs.readFileSync(widgetPath, 'utf-8')
+                    : generateEdsWidgetHtml(config)
+
+                registerAction(server, name, action, widgetHtml, config)
+
+                if (hasWidgetFile) {
+                    console.log(`  ✓ ${name} (${hasHandler ? 'handler' : 'default'} + widget)`)
+                } else if (widgetHtml) {
+                    console.log(`  ✓ ${name} (${hasHandler ? 'handler' : 'default'} + EDS widget)`)
+                } else {
+                    console.log(`  ✓ ${name} (${hasHandler ? 'handler' : 'default'}, tool only)`)
+                }
+            } catch (error) {
+                console.error(`Error registering action "${name}":`, error.message)
+            }
+        }
+    } else {
+        // Fallback: discover from filesystem when no actions.json
+        if (!fs.existsSync(actionsDir)) {
+            console.warn(`Actions directory not found: ${actionsDir}`)
+            return
+        }
+
+        const dirs = fs.readdirSync(actionsDir, { withFileTypes: true })
+            .filter(d => d.isDirectory())
+            .map(d => d.name)
+
+        console.log(`No actions.json found, discovering ${dirs.length} action(s) from ${actionsDir}`)
+
+        for (const dirName of dirs) {
+            try {
+                const indexPath = path.join(actionsDir, dirName, 'index.js')
+                if (!fs.existsSync(indexPath)) {
+                    console.warn(`Skipping ${dirName}: no index.js found`)
+                    continue
+                }
+
+                const mod = require(indexPath)
+                if (!validateAction(mod, dirName)) continue
+
+                const action = normalizeAction(mod)
+
+                const widgetPath = path.join(actionsDir, dirName, 'widget.html')
+                const hasWidgetFile = fs.existsSync(widgetPath)
+
+                if (hasWidgetFile) {
+                    const widgetHtml = fs.readFileSync(widgetPath, 'utf-8')
+                    registerAction(server, dirName, action, widgetHtml, undefined)
+                    console.log(`  ✓ Loaded action: ${dirName} (tool + widget)`)
+                } else {
+                    registerAction(server, dirName, action, null, undefined)
                     console.log(`  ✓ Loaded action: ${dirName} (tool only)`)
                 }
+            } catch (error) {
+                console.error(`Error loading action from ${dirName}:`, error.message)
             }
-        } catch (error) {
-            console.error(`Error loading action from ${dirName}:`, error.message)
         }
     }
 }
 
 module.exports = {
     loadActions,
+    createDefaultHandler,
     generateEdsWidgetHtml,
     RESOURCE_MIME_TYPE
 }

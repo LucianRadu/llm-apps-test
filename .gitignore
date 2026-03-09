@@ -6,9 +6,9 @@ dist
 .env*
 .aio
 
-# Local dev config (copy from experiences.example.json)
-experiences.json
-!test/fixtures/experiences.json
+# Local dev config (copy from actions.example.json)
+actions.json
+!test/fixtures/actions.json
 
 # Test output
 junit.xml

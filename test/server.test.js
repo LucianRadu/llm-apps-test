@@ -15,16 +15,16 @@ governing permissions and limitations under the License.
  *
  * Tests action discovery, tool registration, widget resource serving,
  * and MCP protocol compliance across two modes:
- *   - Mode A: With experiences.json (full metadata from config)
- *   - Mode B: Without experiences.json (handler-only defaults)
+ *   - Mode A: With actions.json (full metadata from config)
+ *   - Mode B: Without actions.json (handler-only defaults)
  */
 
 const fs = require('fs')
 const path = require('path')
 const { main } = require('../server/index.js')
 
-const EXPERIENCES_JSON_PATH = path.resolve(__dirname, '..', 'experiences.json')
-const FIXTURES_EXPERIENCES = path.resolve(__dirname, 'fixtures', 'experiences.json')
+const ACTIONS_JSON_PATH = path.resolve(__dirname, '..', 'actions.json')
+const FIXTURES_ACTIONS = path.resolve(__dirname, 'fixtures', 'actions.json')
 
 function mcpPost (body) {
     return main({
@@ -38,12 +38,12 @@ function mcpPost (body) {
     })
 }
 
-function installExperiencesJson () {
-    fs.copyFileSync(FIXTURES_EXPERIENCES, EXPERIENCES_JSON_PATH)
+function installActionsJson () {
+    fs.copyFileSync(FIXTURES_ACTIONS, ACTIONS_JSON_PATH)
 }
 
-function removeExperiencesJson () {
-    try { fs.unlinkSync(EXPERIENCES_JSON_PATH) } catch (e) { /* ignore */ }
+function removeActionsJson () {
+    try { fs.unlinkSync(ACTIONS_JSON_PATH) } catch (e) { /* ignore */ }
 }
 
 describe('MCP Apps Server', () => {
@@ -82,11 +82,11 @@ describe('MCP Apps Server', () => {
         })
     })
 
-    // --- Mode A: With experiences.json ---
+    // --- Mode A: With actions.json ---
 
-    describe('With experiences.json', () => {
-        beforeAll(() => installExperiencesJson())
-        afterAll(() => removeExperiencesJson())
+    describe('With actions.json', () => {
+        beforeAll(() => installActionsJson())
+        afterAll(() => removeActionsJson())
 
         describe('MCP Protocol', () => {
             test('should handle initialize request', async () => {
@@ -126,10 +126,13 @@ describe('MCP Apps Server', () => {
                 expect(toolNames).toContain('calculator')
                 expect(toolNames).toContain('weather')
                 expect(toolNames).toContain('eds-hello-world')
-                expect(toolNames).toHaveLength(4)
+                expect(toolNames).toContain('showModels')
+                expect(toolNames).toContain('no-handler-tool')
+                expect(toolNames).toContain('no-handler-eds')
+                expect(toolNames).toHaveLength(7)
             })
 
-            test('tools should have descriptions from experiences.json', async () => {
+            test('tools should have descriptions from actions.json', async () => {
                 const result = await mcpPost({
                     jsonrpc: '2.0',
                     id: 3,
@@ -145,7 +148,7 @@ describe('MCP Apps Server', () => {
                 expect(echo.description).toBe('A simple utility that echoes back the input message.')
             })
 
-            test('tools should have inputSchema from experiences.json', async () => {
+            test('tools should have inputSchema from actions.json', async () => {
                 const result = await mcpPost({
                     jsonrpc: '2.0',
                     id: 4,
@@ -165,7 +168,7 @@ describe('MCP Apps Server', () => {
                 expect(calc.inputSchema.properties.format.enum).toEqual(['decimal', 'scientific', 'fraction'])
             })
 
-            test('tools should have annotations from experiences.json', async () => {
+            test('tools should have annotations from actions.json', async () => {
                 const result = await mcpPost({
                     jsonrpc: '2.0',
                     id: 5,
@@ -430,12 +433,125 @@ describe('MCP Apps Server', () => {
                 expect(body.result.structuredContent.shirts[0].id).toBe('button-up-carly-berry')
             })
         })
+
+        describe('Handler-less Actions (config-driven, no /actions/ folder)', () => {
+            test('handler-less tool should appear in tools/list with config metadata', async () => {
+                const result = await mcpPost({
+                    jsonrpc: '2.0',
+                    id: 50,
+                    method: 'tools/list',
+                    params: {}
+                })
+
+                const body = JSON.parse(result.body)
+                const tool = body.result.tools.find(t => t.name === 'no-handler-tool')
+
+                expect(tool).toBeDefined()
+                expect(tool.description).toBe('Action defined in config only, no handler folder exists.')
+                expect(tool.annotations.readOnlyHint).toBe(true)
+                expect(tool.inputSchema.properties.query).toBeDefined()
+            })
+
+            test('handler-less tool should return empty content and structuredContent', async () => {
+                const result = await mcpPost({
+                    jsonrpc: '2.0',
+                    id: 51,
+                    method: 'tools/call',
+                    params: { name: 'no-handler-tool', arguments: {} }
+                })
+
+                expect(result.statusCode).toBe(200)
+                const body = JSON.parse(result.body)
+                expect(body.result.content).toBeDefined()
+                expect(body.result.content[0].text).toBe('')
+                expect(body.result.structuredContent).toEqual({})
+            })
+
+            test('handler-less EDS action should have widget metadata', async () => {
+                const result = await mcpPost({
+                    jsonrpc: '2.0',
+                    id: 52,
+                    method: 'tools/list',
+                    params: {}
+                })
+
+                const body = JSON.parse(result.body)
+                const tool = body.result.tools.find(t => t.name === 'no-handler-eds')
+
+                expect(tool).toBeDefined()
+                expect(tool._meta).toBeDefined()
+                expect(tool._meta.ui.resourceUri).toBe('ui://no-handler-eds/widget.html')
+                expect(tool._meta['openai/outputTemplate']).toBe('ui://no-handler-eds/widget.html')
+                expect(tool._meta['openai/resultCanProduceWidget']).toBe(true)
+            })
+
+            test('handler-less EDS widget resource should be served', async () => {
+                const result = await mcpPost({
+                    jsonrpc: '2.0',
+                    id: 53,
+                    method: 'resources/read',
+                    params: { uri: 'ui://no-handler-eds/widget.html' }
+                })
+
+                expect(result.statusCode).toBe(200)
+                const body = JSON.parse(result.body)
+                const content = body.result.contents[0]
+
+                expect(content.uri).toBe('ui://no-handler-eds/widget.html')
+                expect(content.mimeType).toBe('text/html;profile=mcp-app')
+                expect(content.text).toContain('<aem-embed')
+                expect(content.text).toContain('url="https://main--eds-01--posabogdanpetre.aem.page/eds-widgets/no-handler-test"')
+            })
+
+            test('handler-less EDS widget resource should have CSP metadata', async () => {
+                const result = await mcpPost({
+                    jsonrpc: '2.0',
+                    id: 54,
+                    method: 'resources/read',
+                    params: { uri: 'ui://no-handler-eds/widget.html' }
+                })
+
+                const body = JSON.parse(result.body)
+                const content = body.result.contents[0]
+
+                expect(content._meta).toBeDefined()
+                expect(content._meta.ui.csp).toBeDefined()
+                expect(content._meta.ui.csp.connectDomains).toContain('https://main--eds-01--posabogdanpetre.aem.page')
+            })
+
+            test('handler-less EDS tool should return empty content when called', async () => {
+                const result = await mcpPost({
+                    jsonrpc: '2.0',
+                    id: 55,
+                    method: 'tools/call',
+                    params: { name: 'no-handler-eds', arguments: {} }
+                })
+
+                expect(result.statusCode).toBe(200)
+                const body = JSON.parse(result.body)
+                expect(body.result.content[0].text).toBe('')
+                expect(body.result.structuredContent).toEqual({})
+            })
+
+            test('handler-less tool should NOT have _meta.ui (no widget)', async () => {
+                const result = await mcpPost({
+                    jsonrpc: '2.0',
+                    id: 56,
+                    method: 'tools/list',
+                    params: {}
+                })
+
+                const body = JSON.parse(result.body)
+                const tool = body.result.tools.find(t => t.name === 'no-handler-tool')
+                expect(tool._meta?.ui?.resourceUri).toBeUndefined()
+            })
+        })
     })
 
-    // --- Mode B: Without experiences.json ---
+    // --- Mode B: Without actions.json ---
 
-    describe('Without experiences.json (handler-only defaults)', () => {
-        beforeAll(() => removeExperiencesJson())
+    describe('Without actions.json (handler-only defaults)', () => {
+        beforeAll(() => removeActionsJson())
 
         test('should list all actions as tools with folder-name descriptions', async () => {
             const result = await mcpPost({
@@ -453,7 +569,8 @@ describe('MCP Apps Server', () => {
             expect(toolNames).toContain('calculator')
             expect(toolNames).toContain('weather')
             expect(toolNames).toContain('eds-hello-world')
-            expect(toolNames).toHaveLength(4)
+            expect(toolNames).toContain('showModels')
+            expect(toolNames).toHaveLength(5)
 
             const echo = body.result.tools.find(t => t.name === 'echo')
             expect(echo.description).toBe('echo')
@@ -543,7 +660,7 @@ describe('MCP Apps Server', () => {
             expect(body.result.content[0].text).toContain('No message provided')
         })
 
-        test('EDS action should be tool-only without experiences.json (no widget)', async () => {
+        test('EDS action should be tool-only without actions.json (no widget)', async () => {
             const result = await mcpPost({
                 jsonrpc: '2.0',
                 id: 37,

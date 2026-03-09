@@ -1,5 +1,5 @@
 {
-  "experiences": [
+  "actions": [
     {
       "name": "weather",
       "title": "Weather",
@@ -73,6 +73,34 @@
       "annotations": {
         "readOnlyHint": true,
         "idempotentHint": true
+      }
+    },
+    {
+      "name": "showModels",
+      "title": "Show Models",
+      "description": "Browse Kawasaki motorcycle models in an interactive carousel. Displays enduro and motocross bikes with images and pricing.",
+      "widget_type": "EDS",
+      "eds_widget": {
+        "script_url": "https://main--eds-01--posabogdanpetre.aem.page/scripts/aem-embed.js",
+        "widget_embed_url": "https://main--eds-01--posabogdanpetre.aem.page/eds-widgets/automotive-car-models"
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": true
+      },
+      "tool_meta": {
+        "openai/toolInvocation/invoking": "Loading motorcycle models...",
+        "openai/toolInvocation/invoked": "Motorcycle models ready",
+        "openai/widgetAccessible": true
+      },
+      "resource_meta": {
+        "ui": {
+          "prefersBorder": true,
+          "csp": {
+            "connectDomains": ["https://main--eds-01--posabogdanpetre.aem.page"],
+            "resourceDomains": ["https://main--eds-01--posabogdanpetre.aem.page"]
+          }
+        }
       }
     }
   ]
